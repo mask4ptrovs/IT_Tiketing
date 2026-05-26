@@ -1,0 +1,814 @@
+// This is your Prisma schema file
+// IT Ticketing System - Production Ready Schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Role {
+  USER
+  IT_STAFF
+  ADMIN
+}
+
+enum TicketStatus {
+  OPEN
+  ON_PROGRESS
+  PENDING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TicketCategory {
+  HARDWARE
+  SOFTWARE
+  NETWORK
+  EMAIL
+  PRINTER
+  SECURITY
+  OTHER
+}
+
+enum NotificationType {
+  TICKET_CREATED
+  TICKET_UPDATED
+  TICKET_ASSIGNED
+  TICKET_RESOLVED
+  TICKET_CLOSED
+  COMMENT_ADDED
+  SLA_WARNING
+  SLA_OVERDUE
+}
+
+enum RegulationType {
+  SLA
+  OPERATIONAL
+  SECURITY
+  ESCALATION
+  OTHER
+}
+
+enum ActivityType {
+  TICKET_CREATED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  ASSIGNED
+  COMMENT_ADDED
+  ATTACHMENT_ADDED
+  SLA_UPDATED
+  TICKET_RESOLVED
+  TICKET_CLOSED
+  TICKET_REOPENED
+}
+
+enum POStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AssetCategory {
+  LAPTOP
+  DESKTOP
+  PRINTER
+  MONITOR
+  KEYBOARD
+  MOUSE
+  NETWORK_DEVICE
+  SERVER
+  PHONE
+  TABLET
+  UPS
+  PROJECTOR
+  OTHER
+}
+
+enum AssetCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+}
+
+enum AssetStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model Branch {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  address     String?
+  city        String?
+  phone       String?
+  email       String?
+  managerName String?
+  isActive    Boolean  @default(true)
+  isHeadOffice Boolean @default(false)
+  sigCreator  String   @default("")
+  sigChecker  String   @default("")
+  sigApprover String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users          User[]
+  tickets        Ticket[]
+  regulations    BranchRegulation[]
+  assets         Asset[]
+  purchaseOrders PurchaseOrder[]
+  vendorPOs      VendorPO[]
+  internalPOs    InternalPO[]
+  selisihPOs     SelisihPO[]
+  tandaTerimas   TandaTerima[]
+
+  @@map("branches")
+}
+
+model BranchRegulation {
+  id          String   @id @default(cuid())
+  title       String
+  content     String
+  type        RegulationType @default(OPERATIONAL)
+  orderIndex  Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@index([branchId])
+  @@map("branch_regulations")
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users   User[]
+  tickets Ticket[]
+  assets  Asset[]
+
+  @@map("departments")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  employeeId   String    @unique
+  name         String
+  email        String    @unique
+  password     String
+  role         Role      @default(USER)
+  phone        String?
+  avatar       String?
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  branchId     String?
+  branch       Branch?     @relation(fields: [branchId], references: [id])
+
+  // Tickets created by this user
+  createdTickets Ticket[] @relation("TicketCreator")
+  // Tickets assigned to this user (IT Staff)
+  assignedTickets Ticket[] @relation("TicketAssignee")
+
+  comments      TicketComment[]
+  notifications Notification[]
+  activityLogs  ActivityLog[]
+  refreshTokens RefreshToken[]
+
+  // Asset relations
+  assignedAssets Asset[] @relation("AssetAssignee")
+  createdAssets  Asset[] @relation("AssetCreator")
+
+  // Purchase Order relations
+  createdPOs       PurchaseOrder[] @relation("POCreator")
+  approvedPOs      PurchaseOrder[] @relation("POApprover")
+  vendorPOs        VendorPO[]      @relation("VendorPOCreator")
+  internalPOs      InternalPO[]    @relation("InternalPOCreator")
+  approvedInternal InternalPO[]    @relation("InternalPOApprover")
+  selisihPOs       SelisihPO[]     @relation("SelisihPOCreator")
+  tandaTerimas     TandaTerima[]   @relation("TandaTerimaCreator")
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("refresh_tokens")
+}
+
+model Category {
+  id          String         @id @default(cuid())
+  name        String         @unique
+  code        TicketCategory @unique
+  description String?
+  color       String         @default("#6366f1")
+  icon        String?
+  isActive    Boolean        @default(true)
+  slaHours    Int            @default(24) // Default SLA in hours
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  tickets Ticket[]
+
+  @@map("categories")
+}
+
+model Ticket {
+  id          String         @id @default(cuid())
+  ticketNo    String         @unique
+  title       String
+  description String
+  status      TicketStatus   @default(OPEN)
+  priority    TicketPriority @default(MEDIUM)
+  slaDeadline DateTime?
+  slaBreached Boolean        @default(false)
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  // Relations
+  creatorId    String
+  creator      User     @relation("TicketCreator", fields: [creatorId], references: [id])
+
+  assigneeId   String?
+  assignee     User?    @relation("TicketAssignee", fields: [assigneeId], references: [id])
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+
+  branchId     String?
+  branch       Branch?     @relation(fields: [branchId], references: [id])
+
+  categoryId   String
+  category     Category @relation(fields: [categoryId], references: [id])
+
+  comments     TicketComment[]
+  attachments  Attachment[]
+  activityLogs ActivityLog[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([priority])
+  @@index([creatorId])
+  @@index([assigneeId])
+  @@index([departmentId])
+  @@index([branchId])
+  @@index([categoryId])
+  @@index([createdAt])
+  @@index([slaBreached])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        String   @id @default(cuid())
+  content   String
+  isInternal Boolean @default(false) // Internal notes for IT staff only
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id])
+
+  attachments Attachment[]
+
+  @@index([ticketId])
+  @@map("ticket_comments")
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int      // Size in bytes
+  url          String
+  createdAt    DateTime @default(now())
+
+  ticketId  String?
+  ticket    Ticket?        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  commentId String?
+  comment   TicketComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@map("attachments")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  message   String
+  isRead    Boolean          @default(false)
+  metadata  Json?            // Extra data like ticketId, etc.
+  createdAt DateTime         @default(now())
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  ticketId String?
+  ticket   Ticket? @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model ActivityLog {
+  id          String       @id @default(cuid())
+  type        ActivityType
+  description String
+  oldValue    String?
+  newValue    String?
+  metadata    Json?
+  createdAt   DateTime     @default(now())
+
+  ticketId String
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  actorId String
+  actor   User   @relation(fields: [actorId], references: [id])
+
+  @@index([ticketId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model Asset {
+  id            String         @id @default(cuid())
+  assetCode     String         @unique
+  name          String
+  category      AssetCategory
+  brand         String?
+  model         String?
+  serialNumber  String?
+  purchaseDate  DateTime?
+  purchasePrice Float?
+  condition     AssetCondition @default(GOOD)
+  status        AssetStatus    @default(AVAILABLE)
+  location      String?
+  notes         String?
+  photoUrl      String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  assignedUserId String?
+  assignedUser   User?       @relation("AssetAssignee", fields: [assignedUserId], references: [id])
+
+  branchId      String?
+  branch        Branch?     @relation(fields: [branchId], references: [id])
+
+  departmentId  String?
+  department    Department? @relation(fields: [departmentId], references: [id])
+
+  createdById   String
+  createdBy     User        @relation("AssetCreator", fields: [createdById], references: [id])
+
+  @@index([status])
+  @@index([category])
+  @@index([branchId])
+  @@index([assignedUserId])
+  @@index([departmentId])
+  @@map("assets")
+}
+
+model PurchaseOrder {
+  id             String    @id @default(cuid())
+  poNumber       String    @unique
+  submissionDate DateTime  @default(now())
+  companyName    String
+  workLocation   String
+  position       String?
+  deadline       DateTime?
+  justification  String?
+  status         POStatus  @default(PENDING)
+  totalEstimate  Float     @default(0)
+  notes          String?
+  rejectedReason String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+
+  createdById  String
+  createdBy    User     @relation("POCreator",  fields: [createdById],  references: [id])
+
+  approvedById String?
+  approvedBy   User?    @relation("POApprover", fields: [approvedById], references: [id])
+
+  items       PurchaseOrderItem[]
+  attachments POAttachment[]
+
+  @@index([status])
+  @@index([branchId])
+  @@index([createdById])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id             String  @id @default(cuid())
+  itemNo         Int
+  itemName       String
+  specification  String?
+  qty            Float   @default(1)
+  unit           String  @default("pcs")
+  estimatedPrice Float   @default(0)
+  notes          String?
+
+  poId String
+  po   PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("purchase_order_items")
+}
+
+model POAttachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  description  String?
+  createdAt    DateTime @default(now())
+
+  poId String
+  po   PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("po_attachments")
+}
+
+model CompanySetting {
+  id             String   @id @default("singleton")
+  companyName    String   @default("IT Support")
+  companyTagline String   @default("Ticketing System")
+  companyAddress String   @default("")
+  companyCity    String   @default("")
+  companyPhone   String   @default("")
+  companyEmail   String   @default("")
+  companyWebsite String   @default("")
+  companyLogo    String?
+  sigCreator     String   @default("")
+  sigChecker     String   @default("")
+  sigApprover    String   @default("")
+  updatedAt      DateTime @updatedAt
+
+  @@map("company_settings")
+}
+
+// ── Surat PO Vendor (External PO to Supplier) ─────────────────────────────────
+
+enum VendorPOStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+model VendorPO {
+  id              String         @id @default(cuid())
+  poNumber        String         @unique
+  poDate          DateTime       @default(now())
+
+  supplierName    String
+  supplierPhone   String?
+  supplierFax     String?
+  supplierAddress String?
+
+  deliveryDate    String?
+  deliveryAddress String?
+  receiverName    String?
+  receiverPhone   String?
+  paymentMethod   String?
+
+  notes           String?
+  discount        Float          @default(0)
+  ppnEnabled      Boolean        @default(false)
+  ppnPercent      Float          @default(11)
+  subtotal        Float          @default(0)
+  ppnAmount       Float          @default(0)
+  grandTotal      Float          @default(0)
+
+  status          VendorPOStatus @default(DRAFT)
+
+  branchId        String?
+  branch          Branch?        @relation(fields: [branchId], references: [id])
+  createdById     String
+  createdBy       User           @relation("VendorPOCreator", fields: [createdById], references: [id])
+
+  items           VendorPOItem[]
+  attachments     VendorPOAttachment[]
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status])
+  @@index([branchId])
+  @@index([createdById])
+  @@map("vendor_pos")
+}
+
+model VendorPOItem {
+  id          String   @id @default(cuid())
+  itemNo      Int
+  productName String
+  qty         Float    @default(1)
+  unit        String   @default("pcs")
+  unitPrice   Float    @default(0)
+  totalPrice  Float    @default(0)
+  notes       String?
+
+  poId  String
+  po    VendorPO @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("vendor_po_items")
+}
+
+// ── Surat PO Internal (Internal Purchase Request per Department) ──────────────
+
+enum InternalPOStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+model InternalPO {
+  id            String           @id @default(cuid())
+  poNumber      String           @unique
+  poDate        DateTime         @default(now())
+
+  department    String
+  requestor     String
+  preparedBy    String?
+  description   String?
+  bankInfo      String?
+
+  discount      Float            @default(0)
+  totalAmount   Float            @default(0)
+
+  status        InternalPOStatus @default(DRAFT)
+  rejectedReason String?
+
+  sigDiajukan   String?
+  sigDisetujui  String?
+  sigMengetahui String?
+
+  branchId      String?
+  branch        Branch?          @relation(fields: [branchId], references: [id])
+  createdById   String
+  createdBy     User             @relation("InternalPOCreator", fields: [createdById], references: [id])
+  approvedById  String?
+  approvedBy    User?            @relation("InternalPOApprover", fields: [approvedById], references: [id])
+
+  items         InternalPOItem[]
+  attachments   InternalPOAttachment[]
+
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([status])
+  @@index([branchId])
+  @@index([createdById])
+  @@map("internal_pos")
+}
+
+model InternalPOItem {
+  id         String     @id @default(cuid())
+  itemNo     Int
+  itemName   String
+  supplier   String?
+  qty        Float      @default(1)
+  unit       String     @default("pcs")
+  unitPrice  Float      @default(0)
+  totalPrice Float      @default(0)
+  notes      String?
+
+  poId  String
+  po    InternalPO @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("internal_po_items")
+}
+
+// ── Surat PO Selisih (Variance / Reimbursement PO) ────────────────────────────
+
+model SelisihPO {
+  id             String   @id @default(cuid())
+  poNumber       String   @unique
+  poDate         DateTime @default(now())
+
+  department     String
+  requestor      String
+  preparedBy     String?
+  description    String?
+  bankInfo       String?
+
+  totalAmount    Float    @default(0)
+
+  refPoNumber    String?
+  refPoDate      DateTime?
+  refPoAmount    Float    @default(0)
+  selisihAmount  Float    @default(0)
+
+  status         String   @default("DRAFT")
+
+  sigDiajukan    String?
+  sigMengetahui  String?
+
+  branchId       String?
+  branch         Branch?  @relation(fields: [branchId], references: [id])
+  createdById    String
+  createdBy      User     @relation("SelisihPOCreator", fields: [createdById], references: [id])
+
+  items          SelisihPOItem[]
+  attachments    SelisihPOAttachment[]
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([createdById])
+  @@map("selisih_pos")
+}
+
+model SelisihPOItem {
+  id         String    @id @default(cuid())
+  itemNo     Int
+  itemName   String
+  supplier   String?
+  qty        Float     @default(1)
+  unit       String    @default("pcs")
+  unitPrice  Float     @default(0)
+  totalPrice Float     @default(0)
+  notes      String?
+
+  poId  String
+  po    SelisihPO @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("selisih_po_items")
+}
+
+// ── Tanda Terima (Receipt Document) ──────────────────────────────────────────
+
+model TandaTerima {
+  id           String   @id @default(cuid())
+  ttNumber     String   @unique
+  ttDate       DateTime @default(now())
+
+  receivedFrom String
+  addressedTo  String
+  ccTo         String?
+  receivedBy   String
+  notes        String?
+
+  branchId     String?
+  branch       Branch?  @relation(fields: [branchId], references: [id])
+  createdById  String
+  createdBy    User     @relation("TandaTerimaCreator", fields: [createdById], references: [id])
+
+  items        TandaTerimaItem[]
+  attachments  TandaTerimaAttachment[]
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([createdById])
+  @@map("tanda_terima")
+}
+
+model TandaTerimaItem {
+  id          String    @id @default(cuid())
+  itemNo      Int
+  description String
+  itemDate    DateTime?
+
+  ttId  String
+  tt    TandaTerima @relation(fields: [ttId], references: [id], onDelete: Cascade)
+
+  @@index([ttId])
+  @@map("tanda_terima_items")
+}
+
+// ─── Attachments for new PO types ─────────────────────────────────────────────
+
+model VendorPOAttachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+
+  poId  String
+  po    VendorPO @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("vendor_po_attachments")
+}
+
+model InternalPOAttachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+
+  poId  String
+  po    InternalPO @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("internal_po_attachments")
+}
+
+model SelisihPOAttachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+
+  poId  String
+  po    SelisihPO @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@index([poId])
+  @@map("selisih_po_attachments")
+}
+
+model TandaTerimaAttachment {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  mimeType     String
+  size         Int
+  url          String
+  createdAt    DateTime @default(now())
+
+  ttId  String
+  tt    TandaTerima @relation(fields: [ttId], references: [id], onDelete: Cascade)
+
+  @@index([ttId])
+  @@map("tanda_terima_attachments")
+}
