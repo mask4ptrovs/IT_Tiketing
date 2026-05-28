@@ -48,7 +48,7 @@ const PO_INCLUDE = {
   approvedBy:  { select: { id: true, name: true } },
   branch:      { select: { id: true, name: true, code: true, city: true,
                             address: true, phone: true, email: true,
-                            sigCreator: true, sigApprover: true } },
+                            managerName: true, sigCreator: true, sigApprover: true } },
   items:       { orderBy: { itemNo: 'asc' } },
   attachments: { orderBy: { createdAt: 'asc' } },
 };
@@ -314,7 +314,7 @@ const generatePOPDF = async (req, res) => {
   const jabatanDiajukan  = (po.position || '').trim();
   // Gunakan managerName cabang → fallback sigApprover (ambil baris pertama saja) → approvedBy
   const rawApprover      = po.branch?.managerName || po.branch?.sigApprover || settings.sigApprover || po.approvedBy?.name || '(..................................)';
-  const sigDisetujui     = rawApprover.split(/\n/)[0].trim();
+  const sigDisetujui     = rawApprover.split(/[\r\n]+/)[0].trim();
   const jabatanDisetujui = 'Manager Cabang';
 
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
@@ -690,13 +690,4 @@ module.exports = {
   getPOs, getPOSummary, getPOById,
   createPO, updatePO, updatePOStatus, deletePO,
   generatePOPDF, uploadPOAttachments, deletePOAttachment,
-};
-berhasil dihapus');
-};
-
-module.exports = {
-  getPOs, getPOSummary, getPOById,
-  createPO, updatePO, updatePOStatus, deletePO,
-  generatePOPDF,
-  uploadPOAttachments, deletePOAttachment,
 };
