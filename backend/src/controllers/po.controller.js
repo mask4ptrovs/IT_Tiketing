@@ -309,10 +309,11 @@ const generatePOPDF = async (req, res) => {
     where: { id: 'singleton' }, create: {}, update: {},
   });
 
-  // Signatures
-  const sigDiajukan  = (po.branch?.sigCreator  || settings.sigCreator  || po.createdBy.name).trim();
-  const sigDisetujui = (po.branch?.sigApprover || settings.sigApprover || '').trim()
-    || (po.approvedBy?.name || '(..................................)');
+  // Signatures — Diajukan: pembuat dokumen, Disetujui: manager cabang
+  const sigDiajukan      = po.createdBy.name.trim();
+  const jabatanDiajukan  = (po.position || '').trim();
+  const sigDisetujui     = (po.branch?.sigApprover || settings.sigApprover || po.approvedBy?.name || '(..................................)').trim();
+  const jabatanDisetujui = 'Manager Cabang';
 
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
   res.setHeader('Content-Type', 'application/pdf');
@@ -512,10 +513,10 @@ const generatePOPDF = async (req, res) => {
   }
 
   const SIG_W   = Math.floor((PW - 10) / 2);
-  const SIG_H   = 100;
+  const SIG_H   = 110;
   const sigBoxes = [
-    { label: 'Diajukan',  name: sigDiajukan },
-    { label: 'Disetujui', name: sigDisetujui },
+    { label: 'Diajukan',  name: sigDiajukan,  jabatan: jabatanDiajukan },
+    { label: 'Disetujui', name: sigDisetujui, jabatan: jabatanDisetujui },
   ];
 
   sigBoxes.forEach((sig, i) => {
@@ -528,13 +529,19 @@ const generatePOPDF = async (req, res) => {
        .text(sig.label, sx, y + 5, { width: SIG_W, align: 'center', lineBreak: false });
 
     // Signature line
-    const lineY = y + SIG_H - 28;
+    const lineY = y + SIG_H - 38;
     doc.moveTo(sx + 16, lineY).lineTo(sx + SIG_W - 16, lineY)
        .strokeColor(BORDER).lineWidth(0.5).stroke();
 
     // Name
     doc.font('Helvetica').fontSize(9).fillColor(DARK)
        .text(`( ${sig.name} )`, sx, lineY + 4, { width: SIG_W, align: 'center', lineBreak: false });
+
+    // Jabatan
+    if (sig.jabatan) {
+      doc.font('Helvetica').fontSize(8).fillColor(GRAY)
+         .text(sig.jabatan, sx, lineY + 17, { width: SIG_W, align: 'center', lineBreak: false });
+    }
   });
 
   y += SIG_H + 10;
