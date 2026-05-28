@@ -503,7 +503,7 @@ const generateTicketReport = async (req, res) => {
     companyEmail:   ticket.branch?.email   || company.companyEmail,
     companyLogo:    company.companyLogo,
   };
-  let y = drawKopSurat(doc, effectiveSettings, BURL, ML);
+  let y = await drawKopSurat(doc, effectiveSettings, BURL, ML);
   y = drawDocTitle(doc, 'LAPORAN DETAIL TIKET', y, ML);
 
   // -- TICKET INFO GRID ------------------------------------------------------

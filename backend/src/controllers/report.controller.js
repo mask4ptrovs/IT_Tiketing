@@ -398,7 +398,7 @@ const exportPDF = async (req, res) => {
     companyEmail:   branchInfo?.email   || company.companyEmail,
     companyLogo:    company.companyLogo,
   };
-  let y = drawKopSurat(doc, effectiveSettings, BURL, ML);
+  let y = await drawKopSurat(doc, effectiveSettings, BURL, ML);
   y = drawDocTitle(doc, 'LAPORAN IT', y, ML);
 
   // Periode & cabang sebagai sub-info di bawah judul
@@ -566,7 +566,7 @@ const exportPDF = async (req, res) => {
 
   // ── HALAMAN TANDA TANGAN ──────────────────
   doc.addPage();
-  y = drawKopSurat(doc, effectiveSettings, BURL, ML);
+  y = await drawKopSurat(doc, effectiveSettings, BURL, ML);
   y = drawDocTitle(doc, 'LEMBAR PENGESAHAN', y, ML);
 
   // Info box — height adapts when branch is shown

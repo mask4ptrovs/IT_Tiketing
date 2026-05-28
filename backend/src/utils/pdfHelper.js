@@ -3,8 +3,10 @@
  * Provides a unified kop surat (letterhead) matching the Purchase Request layout.
  */
 
-const fs   = require('fs');
-const path = require('path');
+const fs    = require('fs');
+const path  = require('path');
+const https = require('https');
+const http  = require('http');
 
 const BULAN = ['Januari','Februari','Maret','April','Mei','Juni',
                'Juli','Agustus','September','Oktober','November','Desember'];
@@ -28,9 +30,41 @@ const urlToFilePath = (url) => {
 };
 
 /**
- * drawKopSurat
- * Draws the standard company letterhead on the current PDFKit page,
- * identical to the Purchase Request PDF layout.
+ * Fetch an image URL and return a Buffer.
+ * Returns null on any error (404, network, etc.)
+ */
+const fetchImageBuffer = (url) => new Promise((resolve) => {
+  try {
+    const client = url.startsWith('https') ? https : http;
+    const req = client.get(url, { timeout: 5000 }, (res) => {
+      if (res.statusCode !== 200) { res.resume(); resolve(null); return; }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+      res.on('error', () => resolve(null));
+    });
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => { req.destroy(); resolve(null); });
+  } catch (_) { resolve(null); }
+});
+
+/**
+ * Load an image — tries filesystem first, falls back to HTTP fetch.
+ * Returns a file path string OR Buffer, or null if unavailable.
+ */
+const loadImage = async (url) => {
+  if (!url) return null;
+  // 1) Try filesystem
+  const filePath = urlToFilePath(url);
+  if (filePath && fs.existsSync(filePath)) return filePath;
+  // 2) Fallback: fetch via HTTP (same container)
+  const buf = await fetchImageBuffer(url);
+  return buf || null;
+};
+
+/**
+ * drawKopSurat (async)
+ * Draws the standard company letterhead on the current PDFKit page.
  *
  * @param {PDFDocument} doc       – PDFKit document
  * @param {object}      settings  – CompanySetting record
@@ -38,7 +72,7 @@ const urlToFilePath = (url) => {
  * @param {number}      ML        – left/right margin (default 50)
  * @returns {number} y            – cursor Y after the divider + ready for title
  */
-const drawKopSurat = (doc, settings, backendUrl, ML = 50) => {
+const drawKopSurat = async (doc, settings, backendUrl, ML = 50) => {
   const PW     = doc.page.width - ML * 2;
   const DARK   = '#1a1a1a';
   const GRAY   = '#555555';
@@ -49,10 +83,13 @@ const drawKopSurat = (doc, settings, backendUrl, ML = 50) => {
 
   // ── Logo ────────────────────────────────────────────────────────────────────
   if (settings.companyLogo) {
-    const logoPath = urlToFilePath(`${backendUrl}${settings.companyLogo}`);
-    if (logoPath && fs.existsSync(logoPath)) {
+    const logoUrl = settings.companyLogo.startsWith('http')
+      ? settings.companyLogo
+      : `${backendUrl}${settings.companyLogo}`;
+    const imgSource = await loadImage(logoUrl);
+    if (imgSource) {
       try {
-        doc.image(logoPath, ML, y, { fit: [65, 65] });
+        doc.image(imgSource, ML, y, { fit: [65, 65] });
         logoW = 75;
       } catch (_) {}
     }
@@ -90,18 +127,12 @@ const drawKopSurat = (doc, settings, backendUrl, ML = 50) => {
   doc.moveTo(ML, y).lineTo(ML + PW, y).strokeColor(BORDER).lineWidth(0.5).stroke();
   y += 14;
 
-  return y; // caller places the document title from here
+  return y;
 };
 
 /**
  * drawDocTitle
  * Draws a centred, underlined document title (bold 16 pt) matching the PR style.
- *
- * @param {PDFDocument} doc
- * @param {string}      title  – e.g. "SURAT PURCHASE ORDER"
- * @param {number}      y      – top of the title text
- * @param {number}      ML     – left margin
- * @returns {number}           – y after title + underline
  */
 const drawDocTitle = (doc, title, y, ML = 50) => {
   const PW   = doc.page.width - ML * 2;
@@ -112,11 +143,10 @@ const drawDocTitle = (doc, title, y, ML = 50) => {
   const titleX = ML + (PW - titleW) / 2;
   doc.text(title, titleX, y);
 
-  // manual underline
   doc.moveTo(titleX, y + 19).lineTo(titleX + titleW, y + 19)
      .strokeColor(DARK).lineWidth(1.5).stroke();
 
   return y + 34;
 };
 
-module.exports = { drawKopSurat, drawDocTitle, fmtDateID, urlToFilePath };
+module.exports = { drawKopSurat, drawDocTitle, fmtDateID, urlToFilePath, loadImage };

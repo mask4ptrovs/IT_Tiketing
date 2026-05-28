@@ -320,7 +320,7 @@ const generateHandoverLetter = async (req, res) => {
     companyEmail:   settings.companyEmail,
     companyLogo:    settings.companyLogo,
   };
-  let y = drawKopSurat(doc, effectiveSettings, BACKEND_URL, MARGIN_L);
+  let y = await drawKopSurat(doc, effectiveSettings, BACKEND_URL, MARGIN_L);
   y = drawDocTitle(doc, 'BERITA ACARA SERAH TERIMA BARANG', y, MARGIN_L);
 
   // No. dokumen di bawah judul
@@ -644,7 +644,7 @@ const generateAssetReport = async (req, res) => {
   const AMBER= '#d97706';
 
   // ── Kop Surat ────────────────────────────────────────────────────────────────
-  let y = drawKopSurat(doc, effectiveSettings, BURL, ML);
+  let y = await drawKopSurat(doc, effectiveSettings, BURL, ML);
   y = drawDocTitle(doc, 'LAPORAN INVENTARIS ASET IT', y, ML);
 
   // ── Sub-info: tanggal cetak & cakupan ─────────────────────────────────────
@@ -783,7 +783,7 @@ const generateAssetReport = async (req, res) => {
 
   // ── Halaman TTD ─────────────────────────────────────────────────────────────
   doc.addPage();
-  let yS = drawKopSurat(doc, effectiveSettings, BURL, ML);
+  let yS = await drawKopSurat(doc, effectiveSettings, BURL, ML);
   yS = drawDocTitle(doc, 'LEMBAR PENGESAHAN', yS, ML);
 
   // Info box

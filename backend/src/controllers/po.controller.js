@@ -340,7 +340,7 @@ const generatePOPDF = async (req, res) => {
     companyEmail:   po.branch?.email   || settings.companyEmail,
     companyLogo:    settings.companyLogo,
   };
-  let y = drawKopSurat(doc, effectiveSettings, BACKEND_URL, ML);
+  let y = await drawKopSurat(doc, effectiveSettings, BACKEND_URL, ML);
   y = drawDocTitle(doc, 'PURCHASE REQUEST', y, ML);
 
   // ── Info fields ───────────────────────────────────────────────────────────────

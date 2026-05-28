@@ -115,7 +115,7 @@ const generateTandaTerimaPDF = async (req,res) => {
     companyEmail:   row.branch?.email   || settings.companyEmail,
     companyLogo:    settings.companyLogo,
   };
-  let y = drawKopSurat(doc, effectiveSettings, BURL, ML);
+  let y = await drawKopSurat(doc, effectiveSettings, BURL, ML);
   y = drawDocTitle(doc, 'TANDA TERIMA', y, ML);
 
   // Info rows
