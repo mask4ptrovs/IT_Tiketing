@@ -309,10 +309,12 @@ const generatePOPDF = async (req, res) => {
     where: { id: 'singleton' }, create: {}, update: {},
   });
 
-  // Signatures — Diajukan: pembuat dokumen, Disetujui: manager cabang
+  // Signatures — Diajukan: pembuat dokumen, Disetujui: manager/direktur cabang
   const sigDiajukan      = po.createdBy.name.trim();
   const jabatanDiajukan  = (po.position || '').trim();
-  const sigDisetujui     = (po.branch?.sigApprover || settings.sigApprover || po.approvedBy?.name || '(..................................)').trim();
+  // Gunakan managerName cabang → fallback sigApprover (ambil baris pertama saja) → approvedBy
+  const rawApprover      = po.branch?.managerName || po.branch?.sigApprover || settings.sigApprover || po.approvedBy?.name || '(..................................)';
+  const sigDisetujui     = rawApprover.split(/\n/)[0].trim();
   const jabatanDisetujui = 'Manager Cabang';
 
   const doc = new PDFDocument({ size: 'A4', margin: 50, bufferPages: true });
@@ -688,4 +690,13 @@ module.exports = {
   getPOs, getPOSummary, getPOById,
   createPO, updatePO, updatePOStatus, deletePO,
   generatePOPDF, uploadPOAttachments, deletePOAttachment,
+};
+berhasil dihapus');
+};
+
+module.exports = {
+  getPOs, getPOSummary, getPOById,
+  createPO, updatePO, updatePOStatus, deletePO,
+  generatePOPDF,
+  uploadPOAttachments, deletePOAttachment,
 };
